@@ -1,0 +1,5 @@
+## Interface: 30300
+## Title: ROAR
+## Author: babunigaming
+## Notes: adds original sounds to the /roar emote
+ROAR.lua
