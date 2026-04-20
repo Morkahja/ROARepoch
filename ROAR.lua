@@ -1,53 +1,60 @@
 local f = CreateFrame("Frame")
 
+local ADDON_PREFIX = "ROAR"
 local playerName
+local playerRoarID
 local playerRoarSound
 
 local roarSounds = {
-    Dwarf = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsDwarfMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsDwarfFemale.wav",
-    },
-    Gnome = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsGnomeMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsGnomeFemale.wav",
-    },
-    Human = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsHumanMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsHumanFemale.wav",
-    },
-    NightElf = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsNightElfMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsNightElfFemale.wav",
-    },
-    Orc = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsOrcMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsOrcFemale.wav",
-    },
-    Tauren = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsTaurenMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsTaurenFemale.wav",
-    },
-    Troll = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsTrollMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsTrollFemale.wav",
-    },
-    Scourge = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadFemale.wav",
-    },
-    Undead = {
-        [2] = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadMale.wav",
-        [3] = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadFemale.wav",
-    },
+    DwarfMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsDwarfMale.wav",
+    DwarfFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsDwarfFemale.wav",
+    GnomeMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsGnomeMale.wav",
+    GnomeFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsGnomeFemale.wav",
+    HumanMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsHumanMale.wav",
+    HumanFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsHumanFemale.wav",
+    NightElfMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsNightElfMale.wav",
+    NightElfFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsNightElfFemale.wav",
+    OrcMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsOrcMale.wav",
+    OrcFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsOrcFemale.wav",
+    TaurenMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsTaurenMale.wav",
+    TaurenFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsTaurenFemale.wav",
+    TrollMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsTrollMale.wav",
+    TrollFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsTrollFemale.wav",
+    UndeadMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadMale.wav",
+    UndeadFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadFemale.wav",
+    ScourgeMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadMale.wav",
+    ScourgeFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsUndeadFemale.wav",
 }
 
-local function UpdatePlayerRoarSound()
+local function GetPlayerRoarID()
     local _, raceFile = UnitRace("player")
     local sex = UnitSex("player")
+    local sexText
 
-    if roarSounds[raceFile] and roarSounds[raceFile][sex] then
-        playerRoarSound = roarSounds[raceFile][sex]
+    if sex == 2 then
+        sexText = "Male"
+    elseif sex == 3 then
+        sexText = "Female"
+    else
+        return nil
+    end
+
+    if raceFile == "Scourge" then
+        raceFile = "Undead"
+    end
+
+    if raceFile then
+        return raceFile .. sexText
+    end
+
+    return nil
+end
+
+local function UpdatePlayerRoar()
+    playerRoarID = GetPlayerRoarID()
+
+    if playerRoarID and roarSounds[playerRoarID] then
+        playerRoarSound = roarSounds[playerRoarID]
     else
         playerRoarSound = nil
     end
@@ -75,24 +82,67 @@ local function IsMyRoar(text, sender)
     return false
 end
 
+local function PlayRoarByID(roarID)
+    local soundPath = roarSounds[roarID]
+
+    if soundPath then
+        PlaySoundFile(soundPath)
+    end
+end
+
+local function SendRoarToAddonUsers(roarID)
+    if not roarID then
+        return
+    end
+
+    if UnitInRaid("player") then
+        SendAddonMessage(ADDON_PREFIX, roarID, "RAID")
+    elseif UnitInParty("player") then
+        SendAddonMessage(ADDON_PREFIX, roarID, "PARTY")
+    elseif IsInGuild() then
+        SendAddonMessage(ADDON_PREFIX, roarID, "GUILD")
+    end
+end
+
 f:SetScript("OnEvent", function()
     if event == "PLAYER_LOGIN" then
         playerName = UnitName("player")
-        UpdatePlayerRoarSound()
+        UpdatePlayerRoar()
+        RegisterAddonMessagePrefix(ADDON_PREFIX)
+
     elseif event == "UNIT_MODEL_CHANGED" then
         if arg1 == "player" then
-            UpdatePlayerRoarSound()
+            UpdatePlayerRoar()
         end
+
     elseif event == "CHAT_MSG_TEXT_EMOTE" then
         local text = arg1
         local sender = arg2
 
-        if playerRoarSound and IsMyRoar(text, sender) then
+        if playerRoarSound and playerRoarID and IsMyRoar(text, sender) then
             PlaySoundFile(playerRoarSound)
+            SendRoarToAddonUsers(playerRoarID)
         end
+
+    elseif event == "CHAT_MSG_ADDON" then
+        local prefix = arg1
+        local message = arg2
+        local channel = arg3
+        local sender = arg4
+
+        if prefix ~= ADDON_PREFIX then
+            return
+        end
+
+        if sender == playerName then
+            return
+        end
+
+        PlayRoarByID(message)
     end
 end)
 
 f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("UNIT_MODEL_CHANGED")
 f:RegisterEvent("CHAT_MSG_TEXT_EMOTE")
+f:RegisterEvent("CHAT_MSG_ADDON")
