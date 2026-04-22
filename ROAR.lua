@@ -4,6 +4,10 @@ local playerName
 local playerRoarID
 local playerRoarSound
 
+local ROAR_COOLDOWN = 0.3
+
+local lastRoarTimeBySender = {}
+
 local roarSounds = {
     DwarfMale = "Sound\\Character\\PlayerRoars\\CharacterRoarsDwarfMale.wav",
     DwarfFemale = "Sound\\Character\\PlayerRoars\\CharacterRoarsDwarfFemale.wav",
@@ -160,6 +164,18 @@ local function PlayRoarByID(roarID)
     end
 end
 
+local function CanPlayRoarForSender(senderName)
+    local now = GetTime()
+    local lastTime = lastRoarTimeBySender[senderName]
+
+    if lastTime and (now - lastTime) < ROAR_COOLDOWN then
+        return false
+    end
+
+    lastRoarTimeBySender[senderName] = now
+    return true
+end
+
 f:SetScript("OnEvent", function()
     if event == "PLAYER_LOGIN" then
         playerName = NormalizeName(UnitName("player"))
@@ -178,6 +194,14 @@ f:SetScript("OnEvent", function()
         local roarID
 
         if not IsRoarText(text) then
+            return
+        end
+
+        if not senderName then
+            return
+        end
+
+        if not CanPlayRoarForSender(senderName) then
             return
         end
 
