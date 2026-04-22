@@ -1,6 +1,5 @@
 local f = CreateFrame("Frame")
 
-local ADDON_PREFIX = "ROAR"
 local playerName
 local playerRoarID
 local playerRoarSound
@@ -37,10 +36,18 @@ local function NormalizeName(name)
     return name
 end
 
-local function GetPlayerRoarID()
-    local _, raceFile = UnitRace("player")
-    local sex = UnitSex("player")
+local function GetRoarIDForUnit(unit)
+    if not UnitExists(unit) then
+        return nil
+    end
+
+    local _, raceFile = UnitRace(unit)
+    local sex = UnitSex(unit)
     local sexText
+
+    if raceFile == "Scourge" then
+        raceFile = "Undead"
+    end
 
     if sex == 2 then
         sexText = "Male"
@@ -48,10 +55,6 @@ local function GetPlayerRoarID()
         sexText = "Female"
     else
         return nil
-    end
-
-    if raceFile == "Scourge" then
-        raceFile = "Undead"
     end
 
     if not raceFile then
@@ -62,7 +65,7 @@ local function GetPlayerRoarID()
 end
 
 local function UpdatePlayerRoar()
-    playerRoarID = GetPlayerRoarID()
+    playerRoarID = GetRoarIDForUnit("player")
 
     if playerRoarID then
         playerRoarSound = roarSounds[playerRoarID]
@@ -71,11 +74,7 @@ local function UpdatePlayerRoar()
     end
 end
 
-local function IsMyRoar(text, sender)
-    if NormalizeName(sender) ~= playerName then
-        return false
-    end
-
+local function IsRoarText(text)
     if not text then
         return false
     end
@@ -91,28 +90,6 @@ local function IsMyRoar(text, sender)
     end
 
     return false
-end
-
-local function PlayRoarByID(roarID)
-    local soundPath = roarSounds[roarID]
-
-    if soundPath then
-        PlaySoundFile(soundPath)
-    end
-end
-
-local function SendRoarToAddonUsers(roarID)
-    if not roarID then
-        return
-    end
-
-    if UnitInRaid("player") then
-        SendAddonMessage(ADDON_PREFIX, roarID, "RAID")
-    elseif UnitInParty("player") then
-        SendAddonMessage(ADDON_PREFIX, roarID, "PARTY")
-    elseif IsInGuild() then
-        SendAddonMessage(ADDON_PREFIX, roarID, "GUILD")
-    end
 end
 
 local function FindUnitBySender(sender)
@@ -175,23 +152,17 @@ local function FindUnitBySender(sender)
     return nil
 end
 
-local function IsSenderInRange(sender)
-    local unit = FindUnitBySender(sender)
+local function PlayRoarByID(roarID)
+    local soundPath = roarSounds[roarID]
 
-    if not unit then
-        return false
+    if soundPath then
+        PlaySoundFile(soundPath)
     end
-
-    if unit == "player" then
-        return true
-    end
-
-    return UnitInRange(unit)
 end
 
 f:SetScript("OnEvent", function()
     if event == "PLAYER_LOGIN" then
-        playerName = UnitName("player")
+        playerName = NormalizeName(UnitName("player"))
         UpdatePlayerRoar()
 
     elseif event == "UNIT_MODEL_CHANGED" then
@@ -202,35 +173,33 @@ f:SetScript("OnEvent", function()
     elseif event == "CHAT_MSG_TEXT_EMOTE" then
         local text = arg1
         local sender = arg2
+        local senderName = NormalizeName(sender)
+        local unit
+        local roarID
 
-        if playerRoarSound and playerRoarID and IsMyRoar(text, sender) then
-            PlaySoundFile(playerRoarSound)
-            SendRoarToAddonUsers(playerRoarID)
-        end
-
-    elseif event == "CHAT_MSG_ADDON" then
-        local prefix = arg1
-        local message = arg2
-        local channel = arg3
-        local sender = arg4
-
-        if prefix ~= ADDON_PREFIX then
+        if not IsRoarText(text) then
             return
         end
 
-        if NormalizeName(sender) == playerName then
+        if senderName == playerName then
+            if playerRoarSound then
+                PlaySoundFile(playerRoarSound)
+            end
             return
         end
 
-        if not IsSenderInRange(sender) then
+        unit = FindUnitBySender(sender)
+        if not unit then
             return
         end
 
-        PlayRoarByID(message)
+        roarID = GetRoarIDForUnit(unit)
+        if roarID then
+            PlayRoarByID(roarID)
+        end
     end
 end)
 
 f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("UNIT_MODEL_CHANGED")
 f:RegisterEvent("CHAT_MSG_TEXT_EMOTE")
-f:RegisterEvent("CHAT_MSG_ADDON")
